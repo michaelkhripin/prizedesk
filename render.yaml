@@ -1,0 +1,31 @@
+# Render Blueprint: New > Blueprint > connect this repository.
+# Secrets marked sync: false are entered once in the Render dashboard.
+services:
+  - type: web
+    name: prizedesk
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.0
+      - key: DEMO_MODE
+        value: "1"
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: MAX_BATCH_USD
+        value: "30000"
+      - key: RECLAIM_AFTER_MIN
+        value: "60"
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false

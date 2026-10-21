@@ -23,6 +23,7 @@ export class GeminiLLM implements LLM {
   constructor(
     private readonly apiKey: string,
     private readonly models: string[],
+    private readonly timeoutMs = 40_000,
   ) {}
 
   async step(system: string, messages: Message[], tools: ToolSpec[]): Promise<StepResult> {
@@ -34,11 +35,20 @@ export class GeminiLLM implements LLM {
     };
     let lastError = '';
     for (const model of this.models) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'x-goog-api-key': this.apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'x-goog-api-key': this.apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          // An overloaded model can hold the connection open; move on instead of hanging the chat.
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+      } catch (e) {
+        lastError = `${model}: ${(e as Error).name === 'TimeoutError' ? `no answer in ${this.timeoutMs / 1000}s` : (e as Error).message}`;
+        console.warn(`gemini ${lastError}`);
+        continue;
+      }
       const json = (await res.json()) as {
         candidates?: { content?: Content }[];
         modelVersion?: string;
@@ -46,7 +56,10 @@ export class GeminiLLM implements LLM {
       };
       if (!res.ok) {
         lastError = `${model}: ${res.status} ${json.error?.message ?? ''}`;
-        if (RETRYABLE.has(res.status)) continue;
+        if (RETRYABLE.has(res.status)) {
+          console.warn(`gemini ${lastError.slice(0, 160)}`);
+          continue;
+        }
         throw new Error(lastError);
       }
       const content = json.candidates?.[0]?.content ?? { role: 'model', parts: [] };

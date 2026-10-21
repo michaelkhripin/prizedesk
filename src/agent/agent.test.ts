@@ -34,3 +34,13 @@ describe('agent with the offline model', () => {
     expect(names).not.toMatch(/approve|submit|send_payout|create_payout/);
   });
 });
+
+describe('fallback model', () => {
+  it('answers with the offline model when the LLM is unavailable, and says so', async () => {
+    const { FallbackLLM } = await import('./fallback.js');
+    const down = { name: 'gemini', step: async () => { throw new Error('429 quota'); } };
+    const res = await runAgent(new FallbackLLM(down, new MockLLM()), { store: new Store(null) }, [], 'what is on the desk?');
+    expect(res.actions.map((a) => a.tool)).toEqual(['get_desk_overview']);
+    expect(res.model).toMatch(/offline fallback/);
+  });
+});

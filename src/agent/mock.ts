@@ -34,6 +34,9 @@ function route(text: string): ToolCall {
     return call('draft_recipient_message', { recipient, purpose: /hold|held/.test(t) ? 'hold_notice' : 'share_explanation' });
   }
   if (recipient) return call('explain_recipient', { recipient });
+  if (/invoice|sponsor/.test(t)) {
+    return /check|paid|status/.test(t) ? call('check_sponsor_invoices') : call('invoice_sponsor', { sponsor_id: 'sp_northwind' });
+  }
   if (/status|unclaimed|track|refresh|claimed/.test(t)) return call('refresh_payout_status');
   if (/%|split|draft|policy|cap|placement|\d+\s*\/\s*\d+/.test(t)) {
     const prize = /prize|cup|tournament|placement|1st|\d+\s*\/\s*\d+/.test(t);

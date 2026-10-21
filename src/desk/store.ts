@@ -50,12 +50,26 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
+export interface Sponsor {
+  id: string;
+  name: string;
+  email: string;
+  poolId: PoolId;
+  pledgeCents: number;
+  status: 'pledged' | 'invoiced' | 'paid';
+  invoiceId?: string;
+  invoiceUrl?: string;
+}
+
 export interface State {
   season: Season;
   tournament: Tournament;
   fund: FundEntry[];
+  sponsors: Sponsor[];
   runs: Run[];
   audit: AuditEntry[];
+  /** Ids of PayPal webhook events already handled, newest last. */
+  webhookEvents: string[];
 }
 
 export function seedState(): State {
@@ -67,10 +81,14 @@ export function seedState(): State {
     tournament,
     fund: [
       { id: 'fund_1', at, poolId: season.id, source: 'studio_deposit', amountCents: season.poolCents, ref: 'seed', note: 'Season 7 creator fund deposit' },
-      { id: 'fund_2', at, poolId: tournament.id, source: 'studio_deposit', amountCents: tournament.poolCents, ref: 'seed', note: 'Autumn Cup prize pool deposit' },
+      { id: 'fund_2', at, poolId: tournament.id, source: 'studio_deposit', amountCents: tournament.poolCents / 2, ref: 'seed', note: 'Autumn Cup prize pool: studio half' },
+    ],
+    sponsors: [
+      { id: 'sp_northwind', name: 'Northwind Peripherals', email: 'sponsor-northwind@example.com', poolId: tournament.id, pledgeCents: tournament.poolCents / 2, status: 'pledged' },
     ],
     runs: [],
     audit: [],
+    webhookEvents: [],
   };
 }
 
@@ -79,7 +97,9 @@ export class Store {
   private state: State;
 
   constructor(private readonly file: string | null) {
-    this.state = file && existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as State) : seedState();
+    const loaded = file && existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as Partial<State>) : undefined;
+    // Files written by older versions lack newer fields; a fresh seed fills them in.
+    this.state = loaded?.season ? { ...seedState(), ...loaded } as State : seedState();
     this.save();
   }
 

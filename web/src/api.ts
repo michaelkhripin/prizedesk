@@ -1,5 +1,5 @@
 import type { Allocation, Flag, Season, Tournament } from '../../src/core/types';
-import type { AuditEntry, FundEntry, Run } from '../../src/desk/store';
+import type { AuditEntry, FundEntry, Run, Sponsor } from '../../src/desk/store';
 
 export type RunView = Run & {
   view: {
@@ -22,6 +22,7 @@ export interface DeskState {
   season: Season;
   tournament: Tournament;
   fund: FundEntry[];
+  sponsors: Sponsor[];
   runs: RunView[];
   audit: AuditEntry[];
 }
@@ -30,6 +31,7 @@ export interface PublicConfig {
   paypalClientId: string;
   paypalConfigured: boolean;
   llm: string;
+  demo?: boolean;
   maxBatchUsd: number;
 }
 
@@ -40,7 +42,7 @@ export interface AgentAction {
   summary: string;
 }
 
-export type { Allocation, Flag, Run };
+export type { Allocation, Flag, Run, Sponsor };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -64,6 +66,9 @@ export const api = {
   refresh: (runId: string) => call<{ changes: unknown[] }>('POST', `/api/runs/${runId}/refresh`),
   createOrder: (pack: string) => call<{ orderId: string }>('POST', '/api/checkout/orders', { pack }),
   captureOrder: (orderId: string) => call<{ status: string; toFundCents?: number }>('POST', `/api/checkout/orders/${orderId}/capture`),
+  invoiceSponsor: (id: string, by: string) => call('POST', `/api/sponsors/${id}/invoice`, { by }),
+  checkSponsor: (id: string) => call<{ invoiceStatus: string; credited: boolean }>('POST', `/api/sponsors/${id}/check`),
+  recordSponsorPayment: (id: string, by: string) => call('POST', `/api/sponsors/${id}/record-payment`, { by }),
   reset: () => call('POST', '/api/reset'),
 };
 

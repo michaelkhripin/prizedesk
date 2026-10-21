@@ -81,6 +81,20 @@ export function App() {
             PayPal {config?.paypalConfigured ? 'sandbox' : 'off'}
           </span>
           <span className="badge">AI: {config?.llm ?? '…'}</span>
+          {config?.demo && (
+            <button
+              className="badge"
+              title="Your demo desk is private to you. Start over with fresh data."
+              onClick={async () => {
+                await api.reset();
+                setChat([]);
+                setSessionId(undefined);
+                await refresh();
+              }}
+            >
+              Reset demo
+            </button>
+          )}
         </div>
       </header>
 

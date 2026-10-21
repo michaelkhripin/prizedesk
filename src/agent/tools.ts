@@ -8,12 +8,14 @@ import {
 } from '../core/index.js';
 import { describeAllocation, describeFlag, usd } from '../desk/explain.js';
 import { draftRun, getRun, payable, refreshRun, sumCents, type PayoutsApi } from '../desk/runs.js';
+import { invoiceSponsor, syncSponsorInvoice, type InvoicingApi } from '../desk/sponsors.js';
 import { fundedCents, paidOutCents, type Run, type State, type Store } from '../desk/store.js';
 import type { JsonSchema, ToolSpec } from './llm.js';
 
 export interface ToolContext {
   store: Store;
   payouts?: PayoutsApi;
+  invoicing?: InvoicingApi;
   /** PayPal Agent Toolkit tools (ai-sdk flavour), when PayPal credentials are configured. */
   paypalTools?: Record<string, { description: string; parameters: z.ZodTypeAny; execute: (args: unknown) => Promise<unknown> }>;
 }
@@ -129,10 +131,14 @@ export const deskTools: AgentTool[] = [
         held: r.allocations.filter((a) => a.status === 'held').length,
         approved_by: r.approval?.by,
       }));
+      const sponsors = s.sponsors.map((sp) => ({ sponsor_id: sp.id, name: sp.name, pledge: usd(sp.pledgeCents), status: sp.status, invoice_id: sp.invoiceId }));
       return {
         pools,
+        sponsors,
         runs,
-        summary: `${pools.map((p) => `${p.name}: ${p.available} available of ${p.funded} funded`).join('; ')}. ${runs.length} payout run(s).`,
+        summary:
+          `${pools.map((p) => `${p.name}: ${p.available} available of ${p.funded} funded`).join('; ')}. ` +
+          `${sponsors.map((sp) => `${sp.name} pledged ${sp.pledge} (${sp.status})`).join('; ')}. ${runs.length} payout run(s).`,
       };
     },
   ),
@@ -277,6 +283,42 @@ export const deskTools: AgentTool[] = [
     },
   ),
 ];
+
+function needInvoicing(ctx: ToolContext): InvoicingApi {
+  if (!ctx.invoicing) throw new Error('PayPal is not configured, so invoices are unavailable');
+  return ctx.invoicing;
+}
+
+deskTools.push(
+  tool(
+    'invoice_sponsor',
+    'Create and send a PayPal invoice for a sponsor’s pledged contribution to a prize pool. The pool is credited only after PayPal reports the invoice paid.',
+    z.object({ sponsor_id: z.string().describe('For example sp_northwind; see get_desk_overview') }),
+    async (a, ctx) => {
+      const sp = await invoiceSponsor(ctx.store, needInvoicing(ctx), a.sponsor_id, 'agent');
+      return { sponsor: sp.name, invoice_id: sp.invoiceId, payer_link: sp.invoiceUrl, amount: usd(sp.pledgeCents), summary: `Sent PayPal invoice ${sp.invoiceId} for ${usd(sp.pledgeCents)} to ${sp.name} (${sp.email}). The pool is credited when it is paid.` };
+    },
+  ),
+  tool(
+    'check_sponsor_invoices',
+    'Check every sent sponsor invoice with PayPal and credit the prize pool for any that are now paid.',
+    z.object({}),
+    async (_a, ctx) => {
+      const api = needInvoicing(ctx);
+      const results = [];
+      for (const sp of ctx.store.get().sponsors.filter((x) => x.invoiceId)) {
+        const r = await syncSponsorInvoice(ctx.store, api, sp.id, 'agent');
+        results.push({ sponsor: sp.name, invoice_id: sp.invoiceId, paypal_status: r.invoiceStatus, credited_now: r.credited });
+      }
+      return {
+        invoices: results,
+        summary: results.length
+          ? results.map((r) => `${r.sponsor}: invoice ${r.paypal_status}${r.credited_now ? ', pool credited now' : ''}`).join('; ')
+          : 'No sponsor invoices have been sent yet.',
+      };
+    },
+  ),
+);
 
 /** Wraps PayPal Agent Toolkit tools so the agent can call them like any other tool. */
 export function paypalToolkitTools(ctx: ToolContext): AgentTool[] {

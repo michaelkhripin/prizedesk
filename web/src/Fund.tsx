@@ -13,6 +13,70 @@ const SOURCE_LABEL: Record<string, string> = {
   sponsor_invoice: 'Sponsor invoice',
 };
 
+function approverName(): string {
+  try {
+    return localStorage.getItem('prizedesk.approver') ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function Sponsors({ state, onChanged }: { state: DeskState; onChanged: () => Promise<void> }) {
+  const [msg, setMsg] = useState<string>();
+  const act = async (fn: () => Promise<unknown>, done?: string) => {
+    setMsg(undefined);
+    try {
+      const res = (await fn()) as { invoiceStatus?: string; credited?: boolean };
+      setMsg(done ?? (res?.invoiceStatus ? `PayPal invoice status: ${res.invoiceStatus}${res.credited ? '. Pool credited.' : ''}` : undefined));
+      await onChanged();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  };
+  return (
+    <table>
+      <thead>
+        <tr><th>Sponsor</th><th>Pool</th><th>Status</th><th className="num">Pledge</th><th /></tr>
+      </thead>
+      <tbody>
+        {state.sponsors.map((sp) => (
+          <tr key={sp.id}>
+            <td>{sp.name}<div className="mono" style={{ color: 'var(--muted)' }}>{sp.email}</div></td>
+            <td>{state.pools.find((p) => p.id === sp.poolId)?.name}</td>
+            <td>
+              <span className={`badge ${sp.status === 'paid' ? 'ok' : sp.status === 'invoiced' ? 'warn' : ''}`}>{sp.status}</span>
+              {sp.invoiceUrl && <div><a href={sp.invoiceUrl} target="_blank" rel="noreferrer" className="mono">{sp.invoiceId}</a></div>}
+            </td>
+            <td className="num">{usd(sp.pledgeCents)}</td>
+            <td className="row-actions">
+              {sp.status === 'pledged' && <button onClick={() => act(() => api.invoiceSponsor(sp.id, approverName() || 'studio'), 'Invoice sent with PayPal.')}>Send PayPal invoice</button>}
+              {sp.status === 'invoiced' && (
+                <>
+                  <button onClick={() => act(() => api.checkSponsor(sp.id))}>Check payment</button>
+                  <button
+                    title="The sponsor paid outside PayPal, for example by wire"
+                    onClick={() => {
+                      const by = approverName() || prompt('Your name, for the audit log') || '';
+                      if (by) act(() => api.recordSponsorPayment(sp.id, by), 'Payment recorded on the PayPal invoice. Pool credited.');
+                    }}
+                  >
+                    Record wire payment
+                  </button>
+                </>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+      {msg && (
+        <tfoot>
+          <tr><td colSpan={5}><span className="badge">{msg}</span></td></tr>
+        </tfoot>
+      )}
+    </table>
+  );
+}
+
 export function Fund({ state, config, onChanged }: { state: DeskState; config?: PublicConfig; onChanged: () => Promise<void> }) {
   const [note, setNote] = useState<string>();
   const poolName = (id: string) => state.pools.find((p) => p.id === id)?.name ?? id;
@@ -20,6 +84,7 @@ export function Fund({ state, config, onChanged }: { state: DeskState; config?: 
   return (
     <div className="fund fill">
       <div className="panel scroll">
+        {config?.paypalConfigured && <Sponsors state={state} onChanged={onChanged} />}
         <table>
           <thead>
             <tr><th>When</th><th>Pool</th><th>Source</th><th>Note</th><th className="num">Amount</th></tr>

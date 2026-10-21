@@ -27,8 +27,8 @@ Studios increasingly pay people who are not on payroll: map and mod makers who e
 ```bash
 npm install
 cp .env.example .env   # works as is: offline model, no PayPal calls until you add sandbox keys
-npm test               # 36 tests: splits, fraud checks, policy parsing, guardrails, agent, API
-npm start              # API on http://localhost:8787
+npm test               # 42 tests: splits, fraud checks, policy parsing, guardrails, sponsors, webhooks, agent, API
+npm run dev            # API on :8787 plus the UI on http://localhost:5183
 ```
 
 Optional, with PayPal sandbox keys and a Gemini key in `.env` (`LLM_PROVIDER=gemini`):
@@ -44,8 +44,32 @@ The agent prepares; people decide.
 
 - **No tool can move money.** The agent can draft runs, explain them, check status and draft messages. Approving and submitting are separate endpoints that only a person calls.
 - **An approval is bound to exactly what was approved.** It stores a fingerprint of who gets paid, at which address and how much. If anything changes afterwards, the submit is refused.
-- **A run cannot pay out more than the pool received.** It is checked against the fund ledger: deposits and Checkout sales, minus earlier payouts. Paid sponsor invoices will join the ledger next.
+- **A run cannot pay out more than the pool received.** It is checked against the fund ledger: studio deposits, Checkout sales and paid sponsor invoices, minus earlier payouts. A sponsor invoice counts only once PayPal reports it paid.
 - **A hard per-batch ceiling** (`MAX_BATCH_USD`) applies, plus PayPal idempotency keys so a retried submit cannot pay twice.
+
+## Deploy (Render)
+
+`render.yaml` is a Render Blueprint for a free web service:
+
+1. In Render, go to **New → Blueprint** and connect this repository.
+2. Enter the four secrets it asks for: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `GEMINI_API_KEY`, and `PAYPAL_WEBHOOK_ID` (leave this one empty at first).
+3. After the first deploy, run `npm run webhook:register -- https://<your-app>.onrender.com` locally and put the printed id into `PAYPAL_WEBHOOK_ID`.
+
+The hosted build runs in **demo mode** (`DEMO_MODE=1`):
+
+- Every visitor gets a private, in-memory desk, so judges never see or change each other's runs.
+- The agent, payouts and invoices are rate-limited per visitor.
+- Demo payouts go to `@example.com` addresses, so they stay unclaimed. After an hour they are pulled back to recycle the sandbox test money.
+- If the Gemini free tier is out of quota, the agent answers with the offline model and labels the reply as such.
+
+## Webhooks
+
+`POST /api/webhooks/paypal` accepts these events:
+
+- `PAYMENT.PAYOUTS-ITEM.*` and `PAYMENT.PAYOUTSBATCH.*`, which refresh the matching run;
+- `INVOICING.INVOICE.PAID`, which credits the sponsor's pool.
+
+Each delivery is verified with PayPal's `verify-webhook-signature` API, and an event is processed only once.
 
 ## Built with
 

@@ -17,7 +17,7 @@ export const config = {
   llm: {
     provider: (process.env.LLM_PROVIDER ?? 'mock') as 'mock' | 'gemini',
     geminiKey: process.env.GEMINI_API_KEY ?? '',
-    geminiModels: (process.env.GEMINI_MODELS ?? 'gemini-flash-latest,gemini-3-flash-preview').split(','),
+    geminiModels: (process.env.GEMINI_MODELS ?? 'gemini-3-flash-preview,gemini-3.5-flash,gemini-flash-lite-latest,gemini-flash-latest').split(','),
   },
   maxBatchCents: Math.round(num('MAX_BATCH_USD', 30_000) * 100),
   dataFile: process.env.PRIZEDESK_DATA ?? 'data/state.json',

@@ -21,7 +21,8 @@ export const config = {
   },
   maxBatchCents: Math.round(num('MAX_BATCH_USD', 30_000) * 100),
   dataFile: process.env.PRIZEDESK_DATA ?? 'data/state.json',
-  port: num('PORT', 8787),
+  // API_PORT wins so a dev preview's PORT (meant for Vite) does not move the API.
+  port: num('API_PORT', num('PORT', 8787)),
 };
 
 export const paypalConfigured = () => Boolean(config.paypal.clientId && config.paypal.clientSecret);

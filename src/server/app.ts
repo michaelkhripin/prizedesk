@@ -17,6 +17,8 @@ export interface AppDeps {
   paypalTools?: ToolContext['paypalTools'];
   checkout?: { createOrder: typeof createOrder; captureOrder: typeof captureOrder };
   publicConfig: Record<string, unknown>;
+  /** Built web UI to serve in production (`npm run build`). */
+  staticDir?: string;
 }
 
 /** Supporter packs players can buy; part of each sale feeds the creator fund. */
@@ -109,6 +111,12 @@ export function createApp(deps: AppDeps) {
   );
 
   app.post('/api/reset', wrap(() => (store.reset(), sessions.clear(), { ok: true })));
+
+  if (deps.staticDir) {
+    const dir = deps.staticDir;
+    app.use(express.static(dir));
+    app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile('index.html', { root: dir }));
+  }
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof GuardrailError) return res.status(409).json({ error: err.message, guardrail: true });

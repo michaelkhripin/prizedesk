@@ -5,6 +5,7 @@ import { MockLLM } from '../agent/mock.js';
 import type { ToolContext } from '../agent/tools.js';
 import { config, paypalConfigured } from '../config.js';
 import { Store } from '../desk/store.js';
+import { existsSync } from 'node:fs';
 import { createApp } from './app.js';
 
 const llm: LLM =
@@ -28,6 +29,7 @@ const app = createApp({
   llm,
   maxBatchCents: config.maxBatchCents,
   paypalTools,
+  staticDir: existsSync('dist/web/index.html') ? 'dist/web' : undefined,
   publicConfig: {
     paypalClientId: config.paypal.clientId,
     paypalConfigured: paypalConfigured(),

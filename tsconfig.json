@@ -8,7 +8,22 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": [
+      "node",
+      "vite/client"
+    ],
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ]
   },
-  "include": ["src", "scripts"]
+  "include": [
+    "src",
+    "scripts",
+    "web/src",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

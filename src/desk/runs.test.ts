@@ -97,4 +97,17 @@ describe('payout runs', () => {
     expect(sumCents(payable(second))).toBeGreaterThan(0);
     await expect(submitRun(store, second.id, 3_000_000, fakePayouts().api)).rejects.toThrow(/pool has/);
   });
+
+  it('gives identical drafts on different desks different PayPal batch ids', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const store = new Store(null);
+      const run = draftRun(store, { kind: 'prize_pool', text: '50/30/20' }, 'agent');
+      approveRun(store, run.id, 'Michael');
+      const { api, calls } = fakePayouts();
+      await submitRun(store, run.id, 3_000_000, api);
+      ids.push(calls[0]!.senderBatchId);
+    }
+    expect(ids[0]).not.toBe(ids[1]);
+  });
 });

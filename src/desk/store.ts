@@ -28,6 +28,8 @@ export interface RunItem {
 
 export interface Run {
   id: string;
+  /** Globally unique; becomes PayPal's sender_batch_id, which can never be reused. */
+  uid: string;
   kind: 'revenue_share' | 'prize_pool';
   poolId: PoolId;
   createdAt: string;

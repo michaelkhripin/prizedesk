@@ -52,7 +52,9 @@ export async function paypal<T>(
   const text = await res.text();
   const json = text ? JSON.parse(text) : {};
   if (!res.ok) {
-    throw new PayPalError(res.status, json.name ?? 'PAYPAL_ERROR', json.message ?? res.statusText, json.details);
+    const issue = (json.details as { issue?: string; description?: string }[] | undefined)?.[0];
+    const why = issue ? ` (${[issue.issue, issue.description].filter(Boolean).join(': ')})` : '';
+    throw new PayPalError(res.status, json.name ?? 'PAYPAL_ERROR', `${json.message ?? res.statusText}${why}`, json.details);
   }
   return json as T;
 }

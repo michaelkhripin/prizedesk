@@ -77,10 +77,33 @@ export function runSummary(state: State, run: Run) {
     (rolled.length ? `, ${usd(sumCents(rolled))} from ${rolled.length} small shares rolled over` : '') +
     (run.unassignedCents ? `, ${usd(run.unassignedCents)} left unassigned by the cap` : '') +
     '. A person has to approve it before any money moves.';
+  const pool = run.kind === 'revenue_share' ? state.season : state.tournament;
+  // Per-place totals for prize runs, so the model never has to add them up itself.
+  const places =
+    run.kind === 'prize_pool'
+      ? state.tournament.placements
+          .map((teamId, i) => {
+            const rows = run.allocations.filter((a) => a.reasons.includes(`place_${i + 1}`));
+            if (rows.length === 0) return undefined;
+            const team = state.tournament.teams.find((t) => t.id === teamId)!;
+            return {
+              place: i + 1,
+              team: team.name,
+              players: rows.map((a) => handleOf(state, a.recipientId)),
+              team_total: usd(sumCents(rows)),
+              per_player: usd(rows[0]!.amountCents),
+              decision: rows.every((a) => a.status === 'held') ? 'held' : rows.some((a) => a.status === 'held') ? 'partly held' : 'payable',
+            };
+          })
+          .filter((p) => p !== undefined)
+      : undefined;
   return {
     run_id: run.id,
     kind: run.kind,
     status: run.status,
+    pool_name: pool.name,
+    pool_total_split: usd(pool.poolCents),
+    places,
     policy: run.policy,
     defaulted_fields: run.defaulted,
     payable_total: usd(sumCents(pay)),

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   detectSeasonAnomalies,
   detectTournamentAnomalies,
@@ -48,6 +48,7 @@ export type PolicyInput =
 export function draftRun(store: Store, input: PolicyInput, actor: string): Run {
   return store.update((s) => {
     const id = `run_${s.runs.length + 1}`;
+    const uid = randomUUID().replaceAll('-', '').slice(0, 20);
     const createdAt = new Date().toISOString();
     let run: Run;
     if (input.kind === 'revenue_share') {
@@ -56,14 +57,14 @@ export function draftRun(store: Store, input: PolicyInput, actor: string): Run {
         : parseRevenuePolicyText(input.text);
       const flags = detectSeasonAnomalies(s.season);
       const split = splitRevenueShare(s.season, parsed.policy, flags);
-      run = { id, kind: input.kind, poolId: s.season.id, createdAt, policyText: input.text, policy: parsed.policy, defaulted: parsed.defaulted, flags, ...split, status: 'draft', items: {} };
+      run = { id, uid, kind: input.kind, poolId: s.season.id, createdAt, policyText: input.text, policy: parsed.policy, defaulted: parsed.defaulted, flags, ...split, status: 'draft', items: {} };
     } else {
       const parsed = input.policy
         ? { policy: validatePrizePolicy(input.policy), defaulted: [] }
         : parsePrizePolicyText(input.text);
       const flags = detectTournamentAnomalies(s.tournament);
       const split = splitPrizePool(s.tournament, parsed.policy, flags);
-      run = { id, kind: input.kind, poolId: s.tournament.id, createdAt, policyText: input.text, policy: parsed.policy, defaulted: parsed.defaulted, flags, ...split, status: 'draft', items: {} };
+      run = { id, uid, kind: input.kind, poolId: s.tournament.id, createdAt, policyText: input.text, policy: parsed.policy, defaulted: parsed.defaulted, flags, ...split, status: 'draft', items: {} };
     }
     s.runs.push(run);
     s.audit.push({ at: createdAt, actor, action: 'run.drafted', detail: { runId: id, kind: run.kind, payableCents: sumCents(payable(run)), flags: run.flags.length } });
@@ -116,7 +117,8 @@ export async function submitRun(store: Store, runId: string, maxBatchCents: numb
     note: run.kind === 'revenue_share' ? `${state.season.name}: your creator revenue share` : `${state.tournament.name}: your prize`,
     recipientId: a.recipientId,
   }));
-  const senderBatchId = `prizedesk_${run.id}_${run.approval!.digest}`;
+  // Unique per draft: identical demo data must not collide with an earlier batch.
+  const senderBatchId = `prizedesk_${run.uid ?? `${run.id}_${run.approval!.digest}`}`;
   const subject = run.kind === 'revenue_share' ? `Your ${state.season.name} payout` : `Your ${state.tournament.name} prize`;
   const res = await api.createPayoutBatch(senderBatchId, subject, items);
 

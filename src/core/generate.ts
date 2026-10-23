@@ -16,6 +16,8 @@ const ADJ = ['Neon', 'Rusty', 'Quiet', 'Lucky', 'Frost', 'Hollow', 'Brave', 'Pix
 const NOUN = ['Fox', 'Forge', 'Atlas', 'Golem', 'Comet', 'Lantern', 'Badger', 'Harbor', 'Raven', 'Maple', 'Circuit', 'Otter'];
 const COUNTRIES = ['US', 'DE', 'BR', 'PL', 'GB', 'FR', 'CA', 'ES', 'SE', 'MX', 'AU', 'CY'];
 
+const plural = (noun: string) => (/(s|x)$/.test(noun) ? `${noun}es` : `${noun}s`);
+
 function pick<T>(rnd: () => number, xs: readonly T[]): T {
   return xs[Math.floor(rnd() * xs.length)]!;
 }
@@ -111,7 +113,7 @@ export function generateTournament(opts: TournamentOptions = {}): Tournament {
   const rnd = mulberry32(seed);
   const teams: Team[] = Array.from({ length: 8 }, (_, i) => ({
     id: `tm_${i + 1}`,
-    name: `${pick(rnd, ADJ)} ${pick(rnd, NOUN)}s`,
+    name: `${pick(rnd, ADJ)} ${plural(pick(rnd, NOUN))}`,
   }));
   const players: Player[] = teams.flatMap((t, ti) =>
     Array.from({ length: 3 }, (_, k) => {

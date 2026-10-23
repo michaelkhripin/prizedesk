@@ -1,7 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Allocation, Flag, PrizePolicy, RevenueSharePolicy, Season, Tournament } from '../core/index.js';
-import { generateSeason, generateTournament } from '../core/index.js';
+import {
+  DEFAULT_REVENUE_POLICY,
+  detectSeasonAnomalies,
+  generateSeason,
+  generateTournament,
+  splitRevenueShare,
+} from '../core/index.js';
 import type { ItemStatus } from '../paypal/payouts.js';
 
 export type PoolId = string;
@@ -74,9 +80,40 @@ export interface State {
   webhookEvents: string[];
 }
 
-export function seedState(): State {
+/**
+ * Points a few demo recipients at real PayPal sandbox personal accounts, so a
+ * demo payout shows SUCCESS next to UNCLAIMED. Picks small amounts on purpose:
+ * money sent to these accounts does not come back to the sandbox balance.
+ */
+export function useSandboxRecipients(season: Season, tournament: Tournament, emails: string[]): void {
+  if (emails.length === 0) return;
+  const queue = [...emails];
+  // Cup: the 3rd-place team, the smallest paid place.
+  const third = tournament.placements[2];
+  for (const p of tournament.players.filter((x) => x.teamId === third)) {
+    const email = queue.shift();
+    if (email) p.payoutEmail = email;
+  }
+  // Season: the smallest shares that still clear the default minimum and are not flagged.
+  const { allocations } = splitRevenueShare(season, DEFAULT_REVENUE_POLICY, detectSeasonAnomalies(season));
+  const smallest = allocations
+    .filter((a) => a.status === 'payable')
+    .sort((a, b) => a.amountCents - b.amountCents)
+    .slice(0, queue.length);
+  for (const a of smallest) {
+    const creator = season.creators.find((c) => c.id === a.recipientId);
+    const email = queue.shift();
+    if (creator && email) creator.payoutEmail = email;
+  }
+}
+
+const sandboxRecipients = () =>
+  (process.env.SANDBOX_RECIPIENTS ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+
+export function seedState(emails: string[] = sandboxRecipients()): State {
   const season = generateSeason();
   const tournament = generateTournament();
+  useSandboxRecipients(season, tournament, emails);
   const at = new Date().toISOString();
   return {
     season,

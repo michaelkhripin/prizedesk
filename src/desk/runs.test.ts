@@ -111,3 +111,17 @@ describe('payout runs', () => {
     expect(ids[0]).not.toBe(ids[1]);
   });
 });
+
+describe('sandbox recipients', () => {
+  it('maps real sandbox accounts onto the 3rd-place team and small season shares, without new fraud flags', async () => {
+    const { seedState } = await import('./store.js');
+    const { detectSeasonAnomalies, detectTournamentAnomalies } = await import('../core/index.js');
+    const emails = ['a@personal.example.com', 'b@personal.example.com', 'c@personal.example.com', 'd@personal.example.com', 'e@personal.example.com'];
+    const s = seedState(emails);
+    const third = s.tournament.players.filter((p) => p.teamId === s.tournament.placements[2]);
+    expect(third.map((p) => p.payoutEmail)).toEqual(emails.slice(0, 3));
+    expect(s.season.creators.filter((c) => emails.includes(c.payoutEmail))).toHaveLength(2);
+    expect(detectSeasonAnomalies(s.season)).toEqual(detectSeasonAnomalies(seedState([]).season));
+    expect(detectTournamentAnomalies(s.tournament)).toEqual(detectTournamentAnomalies(seedState([]).tournament));
+  });
+});

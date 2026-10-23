@@ -21,6 +21,9 @@ services:
         value: "30000"
       - key: RECLAIM_AFTER_MIN
         value: "60"
+      # Sandbox test accounts (not secrets): some demo payouts land here as SUCCESS.
+      - key: SANDBOX_RECIPIENTS
+        value: sb-3rpb053493696@personal.example.com,sb-dkoaf53493085@personal.example.com,sb-frj0w53493115@personal.example.com,sb-ookpa53493136@personal.example.com,sb-ud1yb53493171@personal.example.com
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET

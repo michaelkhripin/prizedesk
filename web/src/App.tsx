@@ -28,6 +28,14 @@ export function App() {
     refresh();
   }, [refresh]);
 
+  // PayPal webhooks update the server; while a batch is out, pick their results up without a click.
+  const awaitingPayPal = state?.runs.some((r) => r.status === 'submitted') ?? false;
+  useEffect(() => {
+    if (!awaitingPayPal) return;
+    const timer = setInterval(refresh, 4000);
+    return () => clearInterval(timer);
+  }, [awaitingPayPal, refresh]);
+
   const ask = useCallback(
     async (message: string) => {
       setChat((c) => [...c, { role: 'user', text: message }]);

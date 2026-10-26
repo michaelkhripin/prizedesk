@@ -112,7 +112,7 @@ export function Fund({ state, config, onChanged }: { state: DeskState; config?: 
                 <h3>{p.name} · {p.price}</h3>
                 <p>{p.blurb}</p>
                 <PayPalButtons
-                  style={{ layout: 'horizontal', height: 38, tagline: false }}
+                  style={{ layout: 'vertical', height: 38 }}
                   createOrder={async () => (await api.createOrder(p.id)).orderId}
                   onApprove={async (data) => {
                     const res = await api.captureOrder(data.orderID);
